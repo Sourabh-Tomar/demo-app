@@ -1,0 +1,181 @@
+# Jenkins Helm chart values (corporate defaults)
+replicaCount: 1
+
+image:
+  repository: "jenkins/jenkins"
+  tag: "2.528.1-jdk21"
+
+service:
+  type: ClusterIP
+  port: 8080
+  agentPort: 50000
+
+persistence:
+  enabled: true
+  storageClass: "jenkins-azurefile-csi-premium"
+  size: 10Gi
+  accessMode: "ReadWriteOnce"
+  annotations:
+    helm.sh/resource-policy: keep
+  
+controller:
+  runAsUser: 1000
+  fsGroup: 1000
+  
+  initContainers:
+    - name: init-permissions
+      image: busybox
+      command: 
+        - /bin/sh
+        - -c
+        - |
+          chown -R 1000:1000 /var/jenkins_home
+          chmod -R 755 /var/jenkins_home
+      securityContext:
+        runAsUser: 0
+        privileged: true
+      volumeMounts:
+        - name: jenkins-home
+          mountPath: /var/jenkins_home
+  
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  
+  containerSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    privileged: false
+    allowPrivilegeEscalation: false
+  
+  installPlugins: false  # We'll manage plugins through the plugins section
+  
+  initContainerEnv:
+    - name: "JENKINS_UC"
+      value: "https://updates.jenkins.io"
+  
+  containerEnv:
+    - name: "JAVA_OPTS"
+      value: "-Xms1024m -Xmx3072m -Djenkins.install.runSetupWizard=false -Dhudson.model.DownloadService.noSignatureCheck=true"
+
+  
+  additionalPlugins: []
+  
+  JCasC:
+    enabled: true
+    configScripts:
+      jenkins-casc: |
+        jenkins:
+          globalNodeProperties:
+            - envVars:
+                env:
+                  - key: PATH
+                    value: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/openjdk-11/bin
+  
+  # Removed custom init containers in favor of built-in Jenkins initialization
+
+ingress:
+  enabled: true
+  ingressClassName: "nginx"
+  host: "sourabh-jenkins.techis.store"
+  tls:
+    enabled: true
+    secretName: "jenkins-tls"
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+
+serviceAccount:
+  create: true
+  name: jenkins
+
+resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      cpu: 1
+      memory: 4Gi
+
+plugins:
+  install:
+    # Core plugins
+    - kubernetes:4116.v2d09cd123e7c
+    - workflow-aggregator:596.v8c21c963d92d
+    - git:5.2.1
+    - configuration-as-code:1985.vdda_32d0c4ea_b_
+    
+    # Pipeline and SCM plugins
+    - pipeline-stage-view:2.35
+    - pipeline-build-step:505.v5f0844d8d126
+    - pipeline-input-step:477.v339683a_8d55
+    - pipeline-milestone-step:111.v449306f708b_7
+    - pipeline-model-definition:2.2144.v077a_d1928a_40
+    - pipeline-rest-api:2.34
+    - pipeline-stage-step:305.ve96d0205c1c6
+    - pipeline-utility-steps:2.16.1
+    
+    # Docker support
+    - docker-workflow:572.v950f58993843
+    - docker-plugin:1.5
+    - docker-commons:419.v8e3cd84ef49c
+    
+    # GitHub integration
+    - github:1.37.3
+    - github-branch-source:1728.v859147241f49
+    - github-api:1.314-431.v78d72a_3fe4c3
+    
+    # Build and Deploy tools
+    - maven-plugin:3.22
+    - gradle:2.8.1
+    - ant:497.v94e7d9fffa_b_9
+    
+    # UI and Utility plugins
+    - dashboard-view:2.503
+    - metric-groovy-plugin:1.1.5
+    - metrics:4.2.18-439.v86a_20b_a_8318b_
+    - performance:3.994.vf1f0b_97f657
+    - junit:1240.vf9529b_881428
+    
+    # Security plugins
+    - matrix-auth:3.2.1
+    - credentials:1319.v7eb_51b_3a_c97b_
+    - credentials-binding:642.v737c34dea_6c2
+    - ssh-credentials:308.ve4497b_ccd8f4
+    
+    # Notification plugins
+    - email-ext:2.104
+    - slack:664.v3314976b_8914
+    
+    # Code Quality plugins
+    - checkstyle:4.2.1
+    - findbugs:5.0.0
+    - pmd:2.0.0
+    - cobertura:1.18
+    
+    # Additional utility plugins
+    - timestamper:1.26
+    - build-timeout:1.31
+    - ws-cleanup:0.45
+    - ansicolor:1.0.3
+    - mask-passwords:150.vf80d33113e80
+    - cloudbees-folder:6.858.v898218f3609d
+    - rebuild:320.v5a_0933a_e7d61
+    - role-strategy:679.v3807262fced5
+    - antisamy-markup-formatter:162.v0e6ec0fcfcf6
+    - build-name-setter:2.4.0
+
+# Additional custom jenkins config (config-as-code) can be mounted via configMap or files
+extraConfig:
+  cascConfigMap: "jenkins-casc"
+
+nameOverride: ""
+fullnameOverride: ""

@@ -1,0 +1,27 @@
+apiVersion: cert-manager.io/v1apiVersion: cert-manager.io/v1
+
+kind: ClusterIssuerkind: ClusterIssuer
+
+metadata:metadata:
+
+  name: letsencrypt-prod  name: letsencrypt-prod
+
+spec:spec:
+
+  acme:  acme:
+
+    server: https://acme-v02.api.letsencrypt.org/directory    server: https://acme-v02.api.letsencrypt.org/directory
+
+    email: admin@techis.store    email: admin@techis.store
+
+    privateKeySecretRef:    privateKeySecretRef:
+
+      name: letsencrypt-prod      name: letsencrypt-prod
+
+    solvers:    solvers:
+
+    - http01:    - http01:
+
+        ingress:        ingress:
+
+          class: nginx          class: nginx

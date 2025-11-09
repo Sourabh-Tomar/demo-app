@@ -1,0 +1,80 @@
+replicaCount: 2
+
+image:
+  repository: acrdev081125st.azurecr.io/demo-app
+  tag: latest
+  pullPolicy: Always
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 3000
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  hosts:
+    - host: sourabh.techis.store
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: demo-app-tls
+      hosts:
+        - sourabh.techis.store
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+configMap:
+  data:
+    NODE_ENV: production
+    PORT: "3000"
+
+secrets:
+  enabled: true
+  data:
+    API_KEY: "your-api-key"
+    DB_PASSWORD: "your-db-password"
+
+deployment:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0

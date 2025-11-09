@@ -1,0 +1,84 @@
+controller:controller:
+
+  ingress:  ingress:
+
+    enabled: true    enabled: true
+
+    annotations:    ingressClassName: nginx
+
+      kubernetes.io/ingress.class: nginx    annotations:
+
+      cert-manager.io/cluster-issuer: letsencrypt-prod      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+    hostName: sourabh-jenkins.techis.store    hostName: sourabh-jenkins.techis.store
+
+    tls:    tls:
+
+    - secretName: jenkins-tls    - secretName: jenkins-tls
+
+      hosts:      hosts:
+
+        - sourabh-jenkins.techis.store        - sourabh-jenkins.techis.store
+
+    
+
+  installPlugins:  installPlugins:
+
+    - kubernetes:latest    - kubernetes:4116.v2d09cd123e7c
+
+    - workflow-aggregator:latest    - workflow-aggregator:596.v8c21c963d92d
+
+    - git:latest    - git:5.2.1
+
+    - configuration-as-code:latest    - configuration-as-code:1985.vdda_32d0c4ea_b_
+
+    - docker-workflow:latest    - docker-workflow:572.v950f58993843
+
+    - blueocean:latest    - github:1.37.3
+
+    - github-integration:latest    - github-branch-source:1728.v859147241f49
+
+    - email-ext:latest    - docker-plugin:1.5
+
+    - prometheus:latest    - workflow-job:1546.v62a_c59c112dd
+
+
+
+  adminUser: "admin"  additionalPlugins:
+
+  adminPassword: "admin123"  # Change this in production    - kubernetes-cli:1.12.1
+
+    - job-dsl:1.87
+
+  resources:
+
+    requests:persistence:
+
+      cpu: "500m"  enabled: true
+
+      memory: "1Gi"  storageClass: "azurefile-csi-premium"
+
+    limits:  size: 10Gi
+
+      cpu: "2000m"  annotations:
+
+      memory: "4Gi"    helm.sh/resource-policy: keep
+
+
+
+persistence:serviceAccount:
+
+  enabled: true  create: true
+
+  storageClass: "azurefile"  # Azure Files storage class  name: jenkins
+
+  size: "10Gi"  annotations:
+
+    azure.workload.identity/client-id: "system-assigned"
+serviceAccount:
+  create: true
+  annotations:
+    azure.workload.identity/client-id: ""
+
+rbac:
+  create: true
