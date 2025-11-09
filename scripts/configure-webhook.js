@@ -1,14 +1,16 @@
 const { Octokit } = require('@octokit/rest');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+const crypto = require('crypto');
+const fs = require('fs');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 // GitHub configuration
 const config = {
   owner: 'Sourabh-Tomar',
   repo: 'demo-app',
-  jenkins_url: process.env.JENKINS_URL || 'YOUR_JENKINS_URL',
+  jenkins_url: process.env.JENKINS_URL || 'https://sourabh-jenkins.techis.store',
   github_token: process.env.GITHUB_TOKEN,
-  webhook_secret: process.env.WEBHOOK_SECRET
+  webhook_secret: process.env.WEBHOOK_SECRET || crypto.randomBytes(32).toString('hex')
 };
 
 async function configureWebhook() {
@@ -21,20 +23,21 @@ async function configureWebhook() {
     auth: config.github_token
   });
 
+  // Create webhook configuration
+  const webhookConfig = {
+    owner: config.owner,
+    repo: config.repo,
+    config: {
+      url: `${config.jenkins_url}/github-webhook/`,
+      content_type: 'json',
+      secret: config.webhook_secret,
+      insecure_ssl: '0'
+    },
+    events: ['push'],
+    active: true
+  };
+
   try {
-    // Create webhook configuration
-    const webhookConfig = {
-      owner: config.owner,
-      repo: config.repo,
-      config: {
-        url: `${config.jenkins_url}/github-webhook/`,
-        content_type: 'json',
-        secret: config.webhook_secret,
-        insecure_ssl: '0'
-      },
-      events: ['push'],
-      active: true
-    };
 
     // Create the webhook
     const response = await octokit.repos.createWebhook(webhookConfig);

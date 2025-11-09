@@ -57,7 +57,14 @@ controller:
   
   containerEnv:
     - name: "JAVA_OPTS"
-      value: "-Xms1024m -Xmx3072m -Djenkins.install.runSetupWizard=false -Dhudson.model.DownloadService.noSignatureCheck=true"
+      value: "-Xms1024m -Xmx3072m -Djenkins.install.runSetupWizard=false -Dhudson.model.DownloadService.noSignatureCheck=true -Djenkins.security.ApiTokenProperty.adminCanGenerateNewTokens=true"
+    - name: "JENKINS_OPTS"
+      value: "--argumentsRealm.roles.admin=admin --argumentsRealm.passwd.admin=admin123 --argumentsRealm.roles.user=user"
+    - name: "JENKINS_ADMIN_PASSWORD"
+      valueFrom:
+        secretKeyRef:
+          name: jenkins-admin-secret
+          key: password
 
   
   additionalPlugins: []
@@ -67,11 +74,29 @@ controller:
     configScripts:
       jenkins-casc: |
         jenkins:
+          securityRealm:
+            local:
+              allowsSignup: false
+              enableCaptcha: false
+              users:
+                - id: "admin"
+                  password: "${JENKINS_ADMIN_PASSWORD}"
+          authorizationStrategy:
+            globalMatrix:
+              permissions:
+                - "Overall/Administer:admin"
+                - "Overall/Read:authenticated"
+          remotingSecurity:
+            enabled: true
           globalNodeProperties:
             - envVars:
                 env:
                   - key: PATH
                     value: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/openjdk-11/bin
+          disableRememberMe: true
+          crumbIssuer:
+            standard:
+              excludeClientIPFromCrumb: false
   
   # Removed custom init containers in favor of built-in Jenkins initialization
 

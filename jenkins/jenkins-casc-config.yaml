@@ -1,9 +1,30 @@
 jenkins:
   systemMessage: "Jenkins configured automatically by Jenkins Configuration as Code plugin"
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "${JENKINS_ADMIN_PASSWORD}"
+  authorizationStrategy:
+    globalMatrix:
+      permissions:
+        - "Overall/Administer:admin"
+        - "Overall/Read:authenticated"
   numExecutors: 2
   mode: NORMAL
   scmCheckoutRetryCount: 3
   labelString: "jenkins-controller"
+  security:
+    globalJobDslSecurityConfiguration:
+      useScriptSecurity: true
+    apiToken:
+      creationOfLegacyTokenEnabled: false
+      tokenGenerationOnCreationEnabled: false
+      usageStatisticsEnabled: true
+  unclassified:
+    location:
+      url: "https://sourabh-jenkins.techis.store/"
   
   globalNodeProperties:
     - envVars:
@@ -35,6 +56,19 @@ unclassified:
                 credentialsId: "github-credentials"
 
 security:
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "${JENKINS_ADMIN_PASSWORD}"
+  
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+  disableRememberMe: true
+  
   globalJobDslSecurityConfiguration:
     useScriptSecurity: false
   

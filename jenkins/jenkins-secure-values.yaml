@@ -1,0 +1,60 @@
+controller:
+  adminUser: "admin"
+  adminPassword: "admin123"
+  
+  JCasCConfig:
+    securityRealm: |-
+      local:
+        allowsSignup: false
+        users:
+        - id: "${admin}"
+          password: "${adminpw}"
+    authorizationStrategy: |-
+      loggedInUsersCanDoAnything:
+        allowAnonymousRead: false
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      kubernetes.io/ingress.class: nginx
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    hosts:
+      - host: sourabh-jenkins.techis.store
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: jenkins-tls
+        hosts:
+          - sourabh-jenkins.techis.store
+
+  installPlugins:
+    - kubernetes:3.12.0
+    - workflow-aggregator:2.6
+    - git:4.11.5
+    - configuration-as-code:1.55
+    - job-dsl:1.78.3
+
+  securityRealm: |-
+    local:
+      allowsSignup: false
+      enableCaptcha: false
+      users:
+      - id: ${JENKINS_ADMIN_USER}
+        password: ${JENKINS_ADMIN_PASSWORD}
+
+  authorizationStrategy: |-
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+persistence:
+  enabled: true
+  storageClass: jenkins-azurefile-csi-premium
+  size: 10Gi
+
+serviceAccount:
+  create: true
+  annotations:
+    azure.workload.identity/client-id: "your-azure-client-id"
