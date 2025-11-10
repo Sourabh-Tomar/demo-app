@@ -85,10 +85,12 @@ data:
         def instance = Jenkins.get()
 
         def jenkinsUrl = System.getenv('JENKINS_URL') ?: 'http://jenkins.jenkins.svc.cluster.local:3000/'
-        def adminEmail = System.getenv('JENKINS_ADMIN_EMAIL') ?: 'jenkins@sourabh.techis.store'
-        def replyTo = System.getenv('SMTP_REPLYTO') ?: 'no-reply@sourabh.techis.store'
-        def smtpHost = System.getenv('SMTP_HOST') ?: 'mailhog.jenkins.svc.cluster.local'
-        def smtpPort = System.getenv('SMTP_PORT') ?: '1025'
+        def adminEmail = System.getenv('JENKINS_ADMIN_EMAIL') ?: 'shivam.sharma.942533@gmail.com'
+        def replyTo = System.getenv('SMTP_REPLYTO') ?: 'shivam.sharma.942533@gmail.com'
+    def smtpHost = System.getenv('SMTP_HOST') ?: 'smtp.gmail.com'
+    def smtpPort = System.getenv('SMTP_PORT') ?: '465'
+    def smtpUser = System.getenv('SMTP_USER')
+    def smtpPassword = System.getenv('SMTP_PASSWORD')
 
         def location = JenkinsLocationConfiguration.get()
         location.setUrl(jenkinsUrl)
@@ -98,9 +100,9 @@ data:
         def mailer = instance.getDescriptorByType(Mailer.DescriptorImpl)
         mailer.setSmtpHost(smtpHost)
         mailer.setSmtpPort(smtpPort)
-        mailer.setUseSsl(false)
+        mailer.setUseSsl(true)
         mailer.setUseTls(false)
-        mailer.setAuthentication(null)
+        mailer.setSmtpAuth(smtpUser, smtpPassword)
         mailer.setReplyToAddress(replyTo)
         mailer.setCharset('UTF-8')
         mailer.save()
@@ -110,8 +112,8 @@ data:
             try {
                 emailExt.setSmtpServer(smtpHost)
                 emailExt.setSmtpPort(smtpPort)
-                emailExt.setUseSsl(false)
-                emailExt.setSmtpAuth(null, null)
+                emailExt.setUseSsl(true)
+                emailExt.setSmtpAuth(smtpUser, smtpPassword)
                 emailExt.setCharset('UTF-8')
                 emailExt.setDefaultReplyTo(replyTo)
                 emailExt.setAdvProperties('mail.smtp.starttls.enable=false')
@@ -125,7 +127,7 @@ data:
             println 'Email-ext plugin not installed; skipping extended email configuration'
         }
 
-        println "Configured SMTP server '${smtpHost}:${smtpPort}' with reply-to '${replyTo}'"
+    println "Configured SMTP server '${smtpHost}:${smtpPort}' with reply-to '${replyTo}'"
     } catch (Throwable t) {
         println "Failed to configure SMTP server: ${t.message}"
         t.printStackTrace()

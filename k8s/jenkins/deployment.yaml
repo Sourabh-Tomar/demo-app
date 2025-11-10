@@ -68,13 +68,23 @@ spec:
             - name: JENKINS_URL
               value: "https://sourabh-jenkins.techis.store/"
             - name: JENKINS_ADMIN_EMAIL
-              value: "jenkins@sourabh.techis.store"
+              value: "shivam.sharma.942533@gmail.com"
             - name: SMTP_REPLYTO
-              value: "no-reply@sourabh.techis.store"
+              value: "shivam.sharma.942533@gmail.com"
             - name: SMTP_HOST
-              value: mailhog.jenkins.svc.cluster.local
+              value: smtp.gmail.com
             - name: SMTP_PORT
-              value: "1025"
+              value: "465"
+            - name: SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: jenkins-smtp-secret
+                  key: smtp-user
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: jenkins-smtp-secret
+                  key: smtp-password
           readinessProbe:
             httpGet:
               path: /login
