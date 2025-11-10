@@ -1,14 +1,12 @@
-version: '3.8'
+version: "3.8"
 
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: demo-node-app:latest
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/v1/test"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
+      NODE_ENV: production

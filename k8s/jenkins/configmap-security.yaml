@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jenkins-security-config
+  namespace: jenkins
+data:
+  01-security.groovy: |
+    import hudson.security.FullControlOnceLoggedInAuthorizationStrategy
+    import hudson.security.HudsonPrivateSecurityRealm
+    import jenkins.model.Jenkins
+
+    Jenkins instance = Jenkins.get()
+
+    String adminUser = System.getenv("JENKINS_ADMIN_USER") ?: "ci-admin"
+    String adminPassword = System.getenv("JENKINS_ADMIN_PASSWORD") ?: ""
+
+    if (!adminPassword) {
+        throw new IllegalStateException("JENKINS_ADMIN_PASSWORD environment variable must be provided")
+    }
+
+    HudsonPrivateSecurityRealm realm = instance.getSecurityRealm() instanceof HudsonPrivateSecurityRealm
+        ? instance.getSecurityRealm()
+        : new HudsonPrivateSecurityRealm(false)
+
+    if (realm.getUser(adminUser) == null) {
+        realm.createAccount(adminUser, adminPassword)
+    } else {
+        def user = realm.getUser(adminUser)
+        user.changePassword(adminPassword)
+        user.save()
+    }
+    instance.setSecurityRealm(realm)
+
+    FullControlOnceLoggedInAuthorizationStrategy strategy = new FullControlOnceLoggedInAuthorizationStrategy()
+    strategy.setAllowAnonymousRead(false)
+    instance.setAuthorizationStrategy(strategy)
+
+    instance.save()

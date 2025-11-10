@@ -1,0 +1,38 @@
+controller:
+  replicaCount: 2
+
+  ingressClassResource:
+    name: nginx
+    enabled: true
+    default: true
+
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/azure-load-balancer-resource-group: "MC_dstdemo-rg_dstdemo-aks_centralindia"
+      external-dns.alpha.kubernetes.io/hostname: "sourabh-jenkins.techis.store,sourabh.techis.store"
+    externalTrafficPolicy: Local
+    loadBalancerIP: "4.224.153.92"
+
+  config:
+    use-forwarded-headers: "true"
+    compute-full-forwarded-for: "true"
+    proxy-body-size: "64m"
+    ssl-redirect: "true"
+
+  metrics:
+    enabled: false
+
+  admissionWebhooks:
+    enabled: true
+
+  podAnnotations:
+    prometheus.io/scrape: "false"
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 250Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

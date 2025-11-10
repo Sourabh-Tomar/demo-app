@@ -1,33 +1,66 @@
 pipeline {
-    agent any
+    agent {
+        kubernetes {
+            yaml '''
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    jenkins: agent
+spec:
+  serviceAccountName: default
+  containers:
+  - name: docker
+    image: docker:24-dind
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - name: docker-sock
+      mountPath: /var/run
+  - name: kubectl
+    image: bitnami/kubectl:latest
+    command:
+    - cat
+    tty: true
+  - name: terraform
+    image: hashicorp/terraform:latest
+    command:
+    - cat
+    tty: true
+  - name: azure-cli
+    image: mcr.microsoft.com/azure-cli:latest
+    command:
+    - cat
+    tty: true
+  volumes:
+  - name: docker-sock
+    emptyDir: {}
+'''
+        }
+    }
 
     environment {
-        // Azure Container Registry
-        ACR_NAME = 'acrdev081125st'
-        ACR_LOGIN_SERVER = "${ACR_NAME}.azurecr.io"
-        IMAGE_NAME = 'demo-app'
-        IMAGE_TAG = "${BUILD_NUMBER}"
-        
-        // AKS Details
-        AKS_RESOURCE_GROUP = 'rg-dev'
-        AKS_CLUSTER_NAME = 'aks-dev'
-        K8S_NAMESPACE = 'demo'
-        
-        // Email Notification
-        EMAIL_RECIPIENTS = 'sourabh.tomar.1999st@gmail.com'
-        
-        // Build Retention
-        BUILD_RETENTION = '10'
-        
-        // Disable SSL verification for git if needed
-        GIT_SSL_NO_VERIFY = 'true'
+        ACR_LOGIN_SERVER = credentials('acr-login-server')
+        ACR_CREDENTIALS = credentials('acr-credentials')
+
+        ARM_CLIENT_ID = credentials('azure-client-id')
+        ARM_CLIENT_SECRET = credentials('azure-client-secret')
+        ARM_TENANT_ID = credentials('azure-tenant-id')
+        ARM_SUBSCRIPTION_ID = credentials('azure-subscription-id')
+
+        IMAGE_NAME = 'demo-node'
+        IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
+
+        NOTIFICATION_EMAIL = 'shivam.sharma.942533@gmail.com'
+
+        TF_IN_AUTOMATION = 'true'
+        TF_INPUT = 'false'
     }
 
     options {
-        buildDiscarder(logRotator(numToKeepStr: env.BUILD_RETENTION))
-        disableConcurrentBuilds()
-        timeout(time: 1, unit: 'HOURS')
-        ansiColor('xterm')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timestamps()
+        timeout(time: 30, unit: 'MINUTES')
     }
 
     triggers {
@@ -35,123 +68,183 @@ pipeline {
     }
 
     stages {
-        stage('Validate Environment') {
-            steps {
-                script {
-                    // Check required tools
-                    sh '''
-                        docker --version
-                        kubectl version --client
-                        az --version
-                    '''
-                }
-            }
-        }
-
         stage('Checkout') {
             steps {
-                checkout scm
                 script {
-                    // Get git commit information for the image tag
-                    env.GIT_COMMIT_SHORT = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-                    env.GIT_BRANCH_NAME = sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
-                    // Update image tag to include git info
-                    env.IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
+                    echo "Checking out code from ${env.GIT_BRANCH}"
+                    checkout scm
                 }
             }
         }
 
-        stage('Build and Test') {
+        stage('Terraform Plan (Optional)') {
+            when {
+                anyOf {
+                    branch 'main'
+                    expression { params.RUN_TERRAFORM == true }
+                }
+            }
             steps {
-                script {
-                    // Install dependencies and run tests if any
-                    sh '''
-                        npm install
-                        npm test || echo "No tests found"
-                    '''
+                container('terraform') {
+                    dir('infra/terraform') {
+                        script {
+                            echo "Running Terraform plan..."
+                            sh '''
+                                terraform init -upgrade
+                                terraform plan -var="prefix=dstdemo" -out=tfplan
+                            '''
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Terraform Apply (Manual Approval)') {
+            when {
+                allOf {
+                    branch 'main'
+                    expression { params.RUN_TERRAFORM == true }
+                    expression { params.APPROVE_TERRAFORM == true }
+                }
+            }
+            steps {
+                container('terraform') {
+                    dir('infra/terraform') {
+                        script {
+                            echo "Applying Terraform changes..."
+                            sh '''
+                                terraform apply -auto-approve tfplan
+                            '''
+                            env.ACR_LOGIN_SERVER = sh(
+                                script: 'terraform output -raw acr_login_server',
+                                returnStdout: true
+                            ).trim()
+                        }
+                    }
                 }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    // Build the Docker image with build arguments if needed
-                    docker.build("${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}", "--build-arg NODE_ENV=production .")
-                }
-            }
-        }
-
-        stage('Security Scan') {
-            steps {
-                script {
-                    // Scan Docker image for vulnerabilities (example using Trivy)
-                    sh """
-                        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-                        aquasec/trivy:latest image ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG} || true
-                    """
+                container('docker') {
+                    script {
+                        echo "Building Docker image: ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
+                        sh """
+                            docker buildx build --platform linux/amd64 \
+                                -t ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG} \
+                                -t ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:latest \
+                                --push .
+                        """
+                    }
                 }
             }
         }
 
         stage('Push to ACR') {
             steps {
-                script {
-                    // Login to ACR using Azure credentials
-                    withCredentials([azureServicePrincipal('AZURE_CREDENTIALS')]) {
-                        sh '''
-                            az acr login --name ${ACR_NAME}
-                            docker push ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}
-                            # Also tag and push as latest
-                            docker tag ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG} ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:latest
-                            docker push ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:latest
-                        '''
+                container('azure-cli') {
+                    script {
+                        echo "Logging into Azure Container Registry..."
+                        sh """
+                            az login --service-principal \
+                                --username \${ARM_CLIENT_ID} \
+                                --password \${ARM_CLIENT_SECRET} \
+                                --tenant \${ARM_TENANT_ID}
+                            
+                            az acr login --name \$(echo \${ACR_LOGIN_SERVER} | cut -d'.' -f1)
+                        """
                     }
+                }
+                script {
+                    echo "Image pushed to ACR during build stage"
+                }
+            }
+        }
+
+        stage('Update Kubernetes Manifests') {
+            steps {
+                script {
+                    echo "Updating deployment manifests with new image tag..."
+                    sh """
+                        sed -i 's|image: .*demo-node:.*|image: ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}|g' \
+                            k8s/app/deployment.yaml
+                    """
                 }
             }
         }
 
         stage('Deploy to AKS') {
+            when {
+                branch 'main'
+            }
             steps {
-                script {
-                    withCredentials([azureServicePrincipal('AZURE_CREDENTIALS')]) {
-                        sh '''
-                            # Get AKS credentials
-                            az aks get-credentials --resource-group ${AKS_RESOURCE_GROUP} --name ${AKS_CLUSTER_NAME} --overwrite-existing
+                container('azure-cli') {
+                    script {
+                        echo "Configuring kubectl for AKS..."
+                        sh """
+                            az login --service-principal \
+                                --username \${ARM_CLIENT_ID} \
+                                --password \${ARM_CLIENT_SECRET} \
+                                --tenant \${ARM_TENANT_ID}
                             
-                            # Create namespace if it doesn't exist
-                            kubectl create namespace ${K8S_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
+                            az account set --subscription \${ARM_SUBSCRIPTION_ID}
                             
-                            # Update the kubernetes deployment file with the new image
-                            sed -i "s|image:.*|image: ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}|g" k8s/deployment.yaml
+                            az aks get-credentials \
+                                --resource-group dstdemo-rg \
+                                --name dstdemo-aks \
+                                --overwrite-existing
+                        """
+                    }
+                }
+                container('kubectl') {
+                    script {
+                        echo "Deploying application to AKS..."
+                        sh """
+                            # Apply namespace if it doesn't exist
+                            kubectl apply -f k8s/app/namespace.yaml
                             
-                            # Apply Kubernetes manifests
-                            kubectl apply -f k8s/configmap.yaml -n ${K8S_NAMESPACE}
-                            kubectl apply -f k8s/deployment.yaml -n ${K8S_NAMESPACE}
-                            kubectl apply -f k8s/service.yaml -n ${K8S_NAMESPACE}
-                            kubectl apply -f k8s/ingress.yaml -n ${K8S_NAMESPACE}
+                            # Apply configuration
+                            kubectl apply -f k8s/app/configmap.yaml
+                            kubectl apply -f k8s/app/secret.yaml
+                            
+                            # Deploy application
+                            kubectl apply -f k8s/app/deployment.yaml
+                            kubectl apply -f k8s/app/service.yaml
+                            kubectl apply -f k8s/app/ingress.yaml
+                            
+                            # Wait for rollout to complete
+                            kubectl -n app rollout status deployment/demo-node --timeout=5m
                             
                             # Verify deployment
-                            kubectl rollout status deployment/demo-app -n ${K8S_NAMESPACE} --timeout=300s
-                        '''
+                            kubectl -n app get pods
+                            kubectl -n app get svc
+                            kubectl -n app get ingress
+                        """
                     }
                 }
             }
         }
 
-        stage('Verify Deployment') {
+        stage('Smoke Test') {
+            when {
+                branch 'main'
+            }
             steps {
-                script {
-                    sh '''
-                        # Wait for pods to be ready
-                        kubectl wait --for=condition=ready pod -l app=demo-app -n ${K8S_NAMESPACE} --timeout=300s
-                        
-                        # Get deployment status
-                        kubectl get deployment,svc,pods -n ${K8S_NAMESPACE}
-                        
-                        # Check application health
-                        curl -f http://localhost:8080/health || echo "Health check endpoint not available"
-                    '''
+                container('kubectl') {
+                    script {
+                        echo "Running smoke tests..."
+                        sh """
+                            # Wait for pods to be ready
+                            kubectl -n app wait --for=condition=ready pod \
+                                -l app.kubernetes.io/name=demo-node \
+                                --timeout=300s
+                            
+                            # Get pod name and test the endpoint
+                            POD=\$(kubectl -n app get pod -l app.kubernetes.io/name=demo-node -o jsonpath='{.items[0].metadata.name}')
+                            kubectl -n app exec \$POD -- wget -q -O- http://localhost:3000/api/v1/test
+                        """
+                    }
                 }
             }
         }
@@ -160,49 +253,77 @@ pipeline {
     post {
         success {
             script {
-                emailext (
-                    subject: "Pipeline Success: ${currentBuild.fullDisplayName}",
+                def deploymentUrl = "https://sourabh.techis.store"
+                def jenkinsUrl = "https://sourabh-jenkins.techis.store"
+                
+                emailext(
+                    to: "${NOTIFICATION_EMAIL}",
+                    subject: "Jenkins Build SUCCESS: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
                     body: """
-                        Pipeline completed successfully!
-                        
-                        Build Number: ${BUILD_NUMBER}
-                        Branch: ${env.GIT_BRANCH_NAME}
-                        Commit: ${env.GIT_COMMIT_SHORT}
-                        Image: ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}
-                        
-                        View the build details here: ${BUILD_URL}
+                        <html>
+                        <body style="font-family: Arial, sans-serif;">
+                            <h2 style="color: #28a745;">Build Successful!</h2>
+                            <p><strong>Job:</strong> ${env.JOB_NAME}</p>
+                            <p><strong>Build Number:</strong> ${env.BUILD_NUMBER}</p>
+                            <p><strong>Git Branch:</strong> ${env.GIT_BRANCH}</p>
+                            <p><strong>Git Commit:</strong> ${env.GIT_COMMIT}</p>
+                            <p><strong>Image Tag:</strong> ${IMAGE_TAG}</p>
+                            <hr>
+                            <h3>Deployment Details:</h3>
+                            <ul>
+                                <li><strong>Application URL:</strong> <a href="${deploymentUrl}">${deploymentUrl}</a></li>
+                                <li><strong>Test Endpoint:</strong> <a href="${deploymentUrl}/api/v1/test">${deploymentUrl}/api/v1/test</a></li>
+                                <li><strong>Jenkins:</strong> <a href="${jenkinsUrl}">${jenkinsUrl}</a></li>
+                            </ul>
+                            <hr>
+                            <p><strong>Build Duration:</strong> ${currentBuild.durationString}</p>
+                            <p><strong>Build URL:</strong> <a href="${env.BUILD_URL}">${env.BUILD_URL}</a></p>
+                            <p style="color: #666; font-size: 12px;">
+                                This is an automated message from Jenkins CI/CD Pipeline.
+                            </p>
+                        </body>
+                        </html>
                     """,
-                    to: "${EMAIL_RECIPIENTS}",
-                    attachLog: true
+                    mimeType: 'text/html'
                 )
             }
         }
+        
         failure {
             script {
-                emailext (
-                    subject: "Pipeline Failed: ${currentBuild.fullDisplayName}",
+                emailext(
+                    to: "${NOTIFICATION_EMAIL}",
+                    subject: "Jenkins Build FAILED: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
                     body: """
-                        Pipeline failed!
-                        
-                        Build Number: ${BUILD_NUMBER}
-                        Branch: ${env.GIT_BRANCH_NAME}
-                        Commit: ${env.GIT_COMMIT_SHORT}
-                        
-                        Error Details:
-                        ${currentBuild.description ?: 'See attached log for details'}
-                        
-                        View the build details here: ${BUILD_URL}
+                        <html>
+                        <body style="font-family: Arial, sans-serif;">
+                            <h2 style="color: #dc3545;">Build Failed!</h2>
+                            <p><strong>Job:</strong> ${env.JOB_NAME}</p>
+                            <p><strong>Build Number:</strong> ${env.BUILD_NUMBER}</p>
+                            <p><strong>Git Branch:</strong> ${env.GIT_BRANCH}</p>
+                            <p><strong>Git Commit:</strong> ${env.GIT_COMMIT}</p>
+                            <hr>
+                            <h3>Failure Details:</h3>
+                            <p>The build has failed. Please check the console output for more details.</p>
+                            <p><strong>Build URL:</strong> <a href="${env.BUILD_URL}console">${env.BUILD_URL}console</a></p>
+                            <hr>
+                            <p><strong>Build Duration:</strong> ${currentBuild.durationString}</p>
+                            <p style="color: #666; font-size: 12px;">
+                                This is an automated message from Jenkins CI/CD Pipeline.
+                            </p>
+                        </body>
+                        </html>
                     """,
-                    to: "${EMAIL_RECIPIENTS}",
-                    attachLog: true
+                    mimeType: 'text/html'
                 )
             }
         }
+        
         always {
-            sh '''
-                docker rmi ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG} || true
-                docker rmi ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:latest || true
-            '''
+            script {
+                echo "Pipeline completed with status: ${currentBuild.result}"
+                cleanWs()
+            }
         }
     }
 }

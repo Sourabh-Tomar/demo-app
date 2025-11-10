@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jenkins-plugin-catalog
+  namespace: jenkins
+data:
+  plugins.txt: |
+    kubernetes
+    docker-plugin
+    github
+    email-ext
+    blueocean
+    workflow-aggregator
+    credentials-binding
+    git
+    pipeline-stage-view
