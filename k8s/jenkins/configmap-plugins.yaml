@@ -8,6 +8,7 @@ data:
     kubernetes
     docker-plugin
     github
+    github-branch-source
     email-ext
     blueocean
     workflow-aggregator
@@ -15,3 +16,4 @@ data:
     git
     pipeline-stage-view
     timestamper
+    ws-cleanup

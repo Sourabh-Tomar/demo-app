@@ -1,4 +1,3 @@
-// Main CI/CD pipeline for demo-app
 pipeline {
     agent {
         kubernetes {
@@ -258,7 +257,7 @@ spec:
                 def jenkinsUrl = "https://sourabh-jenkins.techis.store"
                 
                 emailext(
-                    to: "${NOTIFICATION_EMAIL}",
+                    to: env.NOTIFICATION_EMAIL,
                     subject: "Jenkins Build SUCCESS: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
                     body: """
                         <html>
@@ -293,7 +292,7 @@ spec:
         failure {
             script {
                 emailext(
-                    to: "${NOTIFICATION_EMAIL}",
+                    to: env.NOTIFICATION_EMAIL,
                     subject: "Jenkins Build FAILED: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
                     body: """
                         <html>
@@ -323,7 +322,7 @@ spec:
         always {
             script {
                 echo "Pipeline completed with status: ${currentBuild.result}"
-                cleanWs()
+                deleteDir()
             }
         }
     }
