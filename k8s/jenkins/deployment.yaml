@@ -24,7 +24,7 @@ spec:
         fsGroup: 1000
         runAsUser: 1000
         runAsGroup: 1000
-      serviceAccountName: default
+      serviceAccountName: jenkins-controller
       initContainers:
         - name: install-plugins
           image: jenkins/jenkins:lts-jdk17
