@@ -255,11 +255,13 @@ spec:
             script {
                 def deploymentUrl = "https://sourabh.techis.store"
                 def jenkinsUrl = "https://sourabh-jenkins.techis.store"
-                
-                emailext(
-                    to: env.NOTIFICATION_EMAIL,
-                    subject: "Jenkins Build SUCCESS: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
-                    body: """
+                def recipients = env.NOTIFICATION_EMAIL?.trim()
+
+                if (recipients) {
+                    emailext(
+                        to: recipients,
+                        subject: "Jenkins Build SUCCESS: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                        body: """
                         <html>
                         <body style="font-family: Arial, sans-serif;">
                             <h2 style="color: #28a745;">Build Successful!</h2>
@@ -285,16 +287,22 @@ spec:
                         </html>
                     """,
                     mimeType: 'text/html'
-                )
+                    )
+                } else {
+                    echo 'NOTIFICATION_EMAIL not set; skipping success notification.'
+                }
             }
         }
         
         failure {
             script {
-                emailext(
-                    to: env.NOTIFICATION_EMAIL,
-                    subject: "Jenkins Build FAILED: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
-                    body: """
+                def recipients = env.NOTIFICATION_EMAIL?.trim()
+
+                if (recipients) {
+                    emailext(
+                        to: recipients,
+                        subject: "Jenkins Build FAILED: ${env.JOB_NAME} - Build #${env.BUILD_NUMBER}",
+                        body: """
                         <html>
                         <body style="font-family: Arial, sans-serif;">
                             <h2 style="color: #dc3545;">Build Failed!</h2>
@@ -315,7 +323,10 @@ spec:
                         </html>
                     """,
                     mimeType: 'text/html'
-                )
+                    )
+                } else {
+                    echo 'NOTIFICATION_EMAIL not set; skipping failure notification.'
+                }
             }
         }
         
