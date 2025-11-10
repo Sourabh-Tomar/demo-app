@@ -14,3 +14,4 @@ data:
     credentials-binding
     git
     pipeline-stage-view
+    timestamper
