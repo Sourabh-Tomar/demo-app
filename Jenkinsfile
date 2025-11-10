@@ -159,10 +159,11 @@ spec:
             steps {
                 script {
                     echo "Updating deployment manifests with new image tag..."
-                    sh """
-                        sed -i 's|image: .*demo-node:.*|image: ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}|g' \
+                    sh '''
+                        set -euo pipefail
+                        sed -i "s|image: .*demo-node:.*|image: ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}|g" \
                             k8s/app/deployment.yaml
-                    """
+                    '''
                 }
             }
         }
