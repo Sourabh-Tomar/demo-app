@@ -65,6 +65,16 @@ spec:
                 secretKeyRef:
                   name: jenkins-admin-credentials
                   key: password
+            - name: JENKINS_URL
+              value: "https://sourabh-jenkins.techis.store/"
+            - name: JENKINS_ADMIN_EMAIL
+              value: "jenkins@sourabh.techis.store"
+            - name: SMTP_REPLYTO
+              value: "no-reply@sourabh.techis.store"
+            - name: SMTP_HOST
+              value: mailhog.jenkins.svc.cluster.local
+            - name: SMTP_PORT
+              value: "1025"
           readinessProbe:
             httpGet:
               path: /login
@@ -90,6 +100,10 @@ spec:
             - name: security-config
               mountPath: /var/jenkins_home/init.groovy.d/02-kubernetes-cloud.groovy
               subPath: 02-kubernetes-cloud.groovy
+              readOnly: true
+            - name: security-config
+              mountPath: /var/jenkins_home/init.groovy.d/03-smtp.groovy
+              subPath: 03-smtp.groovy
               readOnly: true
       volumes:
         - name: jenkins-home

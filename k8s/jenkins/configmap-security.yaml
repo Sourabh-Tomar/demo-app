@@ -75,3 +75,36 @@ data:
         println "Failed to configure Kubernetes cloud: ${t.message}"
         t.printStackTrace()
     }
+  03-smtp.groovy: |
+    import hudson.tasks.Mailer
+    import jenkins.model.Jenkins
+    import jenkins.model.JenkinsLocationConfiguration
+
+    try {
+        def instance = Jenkins.get()
+
+        def jenkinsUrl = System.getenv('JENKINS_URL') ?: 'http://jenkins.jenkins.svc.cluster.local:3000/'
+        def adminEmail = System.getenv('JENKINS_ADMIN_EMAIL') ?: 'jenkins@sourabh.techis.store'
+        def replyTo = System.getenv('SMTP_REPLYTO') ?: 'no-reply@sourabh.techis.store'
+        def smtpHost = System.getenv('SMTP_HOST') ?: 'mailhog.jenkins.svc.cluster.local'
+        def smtpPort = System.getenv('SMTP_PORT') ?: '1025'
+
+        def location = JenkinsLocationConfiguration.get()
+        location.setUrl(jenkinsUrl)
+        location.setAdminAddress(adminEmail)
+        location.save()
+
+    def mailer = instance.getDescriptorByType(Mailer.DescriptorImpl)
+    mailer.setSmtpHost(smtpHost)
+    mailer.setSmtpPort(smtpPort)
+    mailer.setUseSsl(false)
+    mailer.setAuthentication(null)
+    mailer.setReplyToAddress(replyTo)
+    mailer.setCharset('UTF-8')
+        mailer.save()
+
+        println "Configured SMTP server '${smtpHost}:${smtpPort}' with reply-to '${replyTo}'"
+    } catch (Throwable t) {
+        println "Failed to configure SMTP server: ${t.message}"
+        t.printStackTrace()
+    }

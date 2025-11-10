@@ -128,14 +128,20 @@ spec:
         stage('Build Docker Image') {
             steps {
                 container('docker') {
-                    script {
-                        echo "Building Docker image: ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
-                        sh """
+                    withCredentials([usernamePassword(credentialsId: 'acr-credentials', usernameVariable: 'ACR_USERNAME', passwordVariable: 'ACR_PASSWORD')]) {
+                        sh '''
+                            set -eu
+                            echo "Authenticating with Azure Container Registry..."
+                            set +x
+                            echo "$ACR_PASSWORD" | docker login "$ACR_LOGIN_SERVER" --username "$ACR_USERNAME" --password-stdin
+                            set -x
+                            echo "Building Docker image: $ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG"
                             docker buildx build --platform linux/amd64 \
-                                -t ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG} \
-                                -t ${ACR_LOGIN_SERVER}/${IMAGE_NAME}:latest \
+                                -t "$ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG" \
+                                -t "$ACR_LOGIN_SERVER/$IMAGE_NAME:latest" \
                                 --push .
-                        """
+                            docker logout "$ACR_LOGIN_SERVER"
+                        '''
                     }
                 }
             }
@@ -143,21 +149,8 @@ spec:
 
         stage('Push to ACR') {
             steps {
-                container('azure-cli') {
-                    script {
-                        echo "Logging into Azure Container Registry..."
-                        sh """
-                            az login --service-principal \
-                                --username \${ARM_CLIENT_ID} \
-                                --password \${ARM_CLIENT_SECRET} \
-                                --tenant \${ARM_TENANT_ID}
-                            
-                            az acr login --name \$(echo \${ACR_LOGIN_SERVER} | cut -d'.' -f1)
-                        """
-                    }
-                }
                 script {
-                    echo "Image pushed to ACR during build stage"
+                    echo 'Image push is handled as part of the Docker build stage; no additional action required.'
                 }
             }
         }
