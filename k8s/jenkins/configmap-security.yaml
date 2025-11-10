@@ -76,6 +76,7 @@ data:
         t.printStackTrace()
     }
   03-smtp.groovy: |
+    import hudson.plugins.emailext.ExtendedEmailPublisherDescriptor
     import hudson.tasks.Mailer
     import jenkins.model.Jenkins
     import jenkins.model.JenkinsLocationConfiguration
@@ -94,15 +95,35 @@ data:
         location.setAdminAddress(adminEmail)
         location.save()
 
-    def mailer = instance.getDescriptorByType(Mailer.DescriptorImpl)
-    mailer.setSmtpHost(smtpHost)
-    mailer.setSmtpPort(smtpPort)
-    mailer.setUseSsl(false)
-    mailer.setUseTls(false)
-    mailer.setAuthentication(null)
-    mailer.setReplyToAddress(replyTo)
-    mailer.setCharset('UTF-8')
+        def mailer = instance.getDescriptorByType(Mailer.DescriptorImpl)
+        mailer.setSmtpHost(smtpHost)
+        mailer.setSmtpPort(smtpPort)
+        mailer.setUseSsl(false)
+        mailer.setUseTls(false)
+        mailer.setAuthentication(null)
+        mailer.setReplyToAddress(replyTo)
+        mailer.setCharset('UTF-8')
         mailer.save()
+
+        def emailExt = instance.getDescriptorByType(ExtendedEmailPublisherDescriptor)
+        if (emailExt) {
+            try {
+                emailExt.setSmtpServer(smtpHost)
+                emailExt.setSmtpPort(smtpPort)
+                emailExt.setUseSsl(false)
+                emailExt.setSmtpAuth(null, null)
+                emailExt.setCharset('UTF-8')
+                emailExt.setDefaultReplyTo(replyTo)
+                emailExt.setAdvProperties('mail.smtp.starttls.enable=false')
+                emailExt.save()
+                println "Configured Email-ext plugin for host '${smtpHost}:${smtpPort}'"
+            } catch (Throwable et) {
+                println "Failed to configure Email-ext plugin: ${et.message}"
+                et.printStackTrace()
+            }
+        } else {
+            println 'Email-ext plugin not installed; skipping extended email configuration'
+        }
 
         println "Configured SMTP server '${smtpHost}:${smtpPort}' with reply-to '${replyTo}'"
     } catch (Throwable t) {
