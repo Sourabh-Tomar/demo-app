@@ -83,6 +83,14 @@ spec:
             - name: security-config
               mountPath: /usr/share/jenkins/ref/init.groovy.d
               readOnly: true
+            - name: security-config
+              mountPath: /var/jenkins_home/init.groovy.d/01-security.groovy
+              subPath: 01-security.groovy
+              readOnly: true
+            - name: security-config
+              mountPath: /var/jenkins_home/init.groovy.d/02-kubernetes-cloud.groovy
+              subPath: 02-kubernetes-cloud.groovy
+              readOnly: true
       volumes:
         - name: jenkins-home
           persistentVolumeClaim:

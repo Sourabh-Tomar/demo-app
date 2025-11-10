@@ -41,34 +41,36 @@ data:
         def instance = Jenkins.get()
         def cloudName = 'kubernetes'
 
-        if (instance.clouds.getByName(cloudName) == null) {
-            if (instance.pluginManager.getPlugin('kubernetes') == null) {
-                println "Kubernetes plugin not installed; skipping cloud configuration"
-                return
-            }
+        if (instance.pluginManager.getPlugin('kubernetes') == null) {
+            println "Kubernetes plugin not installed; skipping cloud configuration"
+            return
+        }
 
-            def serverUrl = 'https://kubernetes.default.svc.cluster.local'
-            def namespace = System.getenv('POD_NAMESPACE') ?: 'jenkins'
-            def jenkinsServiceHost = System.getenv('JENKINS_SERVICE_HOST') ?: 'jenkins'
-            def jenkinsHttpPort = System.getenv('JENKINS_SERVICE_PORT_HTTP') ?: '80'
-            def jenkinsAgentPort = System.getenv('JENKINS_SERVICE_PORT_AGENT') ?: '50000'
-            def jenkinsUrl = "http://${jenkinsServiceHost}.${namespace}.svc.cluster.local:${jenkinsHttpPort}"
-            def jenkinsTunnel = "${jenkinsServiceHost}.${namespace}.svc.cluster.local:${jenkinsAgentPort}"
+        def serverUrl = 'https://kubernetes.default.svc.cluster.local'
+        def namespace = System.getenv('POD_NAMESPACE') ?: 'jenkins'
+        def jenkinsServiceName = System.getenv('JENKINS_SERVICE_NAME') ?: 'jenkins'
+        def jenkinsHttpPort = System.getenv('JENKINS_SERVICE_PORT_HTTP') ?: '80'
+        def jenkinsAgentPort = System.getenv('JENKINS_SERVICE_PORT_AGENT') ?: '50000'
+        def jenkinsUrl = "http://${jenkinsServiceName}.${namespace}.svc.cluster.local:${jenkinsHttpPort}"
+        def jenkinsTunnel = "${jenkinsServiceName}.${namespace}.svc.cluster.local:${jenkinsAgentPort}"
 
-            def cloud = new org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud(cloudName)
-            cloud.setServerUrl(serverUrl)
-            cloud.setNamespace(namespace)
-            cloud.setSkipTlsVerify(true)
-            cloud.setJenkinsUrl(jenkinsUrl)
-            cloud.setJenkinsTunnel(jenkinsTunnel)
-            cloud.setContainerCapStr('10')
-
+        def cloud = instance.clouds.getByName(cloudName)
+        if (cloud == null) {
+            cloud = new org.csanchez.jenkins.plugins.kubernetes.KubernetesCloud(cloudName)
             instance.clouds.add(cloud)
-            instance.save()
             println "Configured Kubernetes cloud '${cloudName}' for namespace '${namespace}'"
         } else {
-            println "Kubernetes cloud '${cloudName}' already configured"
+            println "Kubernetes cloud '${cloudName}' already configured; applying desired settings"
         }
+
+        cloud.setServerUrl(serverUrl)
+        cloud.setNamespace(namespace)
+        cloud.setSkipTlsVerify(true)
+        cloud.setJenkinsUrl(jenkinsUrl)
+        cloud.setJenkinsTunnel(jenkinsTunnel)
+        cloud.setContainerCapStr('10')
+
+        instance.save()
     } catch (Throwable t) {
         println "Failed to configure Kubernetes cloud: ${t.message}"
         t.printStackTrace()
