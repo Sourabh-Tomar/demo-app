@@ -132,3 +132,36 @@ data:
         println "Failed to configure SMTP server: ${t.message}"
         t.printStackTrace()
     }
+  04-pipeline-job.groovy: |
+    import jenkins.model.Jenkins
+    import org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject
+    import jenkins.branch.BranchSource
+    import org.jenkinsci.plugins.github_branch_source.GitHubSCMSource
+
+    try {
+        def instance = Jenkins.getInstance()
+        def jobName = 'demo-app-pipeline'
+
+        def job = instance.getItem(jobName)
+        
+        if (job == null) {
+            println "Creating Multibranch Pipeline job: ${jobName}"
+            
+            def project = instance.createProject(WorkflowMultiBranchProject, jobName)
+            
+            def scmSource = new GitHubSCMSource('Sourabh-Tomar', 'demo-app')
+            def branchSource = new BranchSource(scmSource)
+            
+            project.getSourcesList().add(branchSource)
+            project.save()
+            
+            println "Created Multibranch Pipeline job: ${jobName}"
+        } else {
+            println "Pipeline job '${jobName}' already exists"
+        }
+        
+        instance.save()
+    } catch (Throwable t) {
+        println "Failed to create pipeline job: ${t.message}"
+        t.printStackTrace()
+    }
