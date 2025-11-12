@@ -51,7 +51,7 @@ spec:
         IMAGE_NAME = 'demo-node'
         IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_COMMIT.take(7)}"
 
-        NOTIFICATION_EMAIL = 'shivam.sharma.942533@gmail.com'
+        NOTIFICATION_EMAIL = 'shivam.sharma.942533@gmail.com, sourabh.tomar.1999st@gmail.com'
 
         TF_IN_AUTOMATION = 'true'
         TF_INPUT = 'false'
