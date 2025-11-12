@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-node
+  namespace: app
+  labels:
+    app.kubernetes.io/name: demo-node
+spec:
+  selector:
+    app.kubernetes.io/name: demo-node
+    version: blue  # Change to 'green' to switch traffic
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  type: ClusterIP
